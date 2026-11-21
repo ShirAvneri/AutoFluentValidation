@@ -1,0 +1,28 @@
+<Project>
+  <!--
+    AutoFluentValidation: write the generated validators into the consuming project.
+
+    The compiler always uses the in-memory generated sources; the files in $(AutoValidatorsDirectory)
+    are a read-only mirror, refreshed on every build, so you can browse, diff and commit them.
+
+    Override in your .csproj:
+      <AutoValidatorsEmitToProject>false</AutoValidatorsEmitToProject>   turn the mirror off
+      <AutoValidatorsDirectory>Validation/Generated</AutoValidatorsDirectory>  change the folder
+  -->
+  <PropertyGroup>
+    <AutoValidatorsEmitToProject Condition="'$(AutoValidatorsEmitToProject)' == ''">true</AutoValidatorsEmitToProject>
+    <AutoValidatorsDirectory Condition="'$(AutoValidatorsDirectory)' == ''">AutoValidators</AutoValidatorsDirectory>
+  </PropertyGroup>
+
+  <!--
+    Consumers write `using AutoFluentValidation;` only. FluentValidation itself (IValidator<T>, Severity,
+    the rule extension methods used in ConfigureRules, ...) is imported project-wide via a global using.
+
+    Opt out in your .csproj:
+      <AutoFluentValidationImportFluentValidation>false</AutoFluentValidationImportFluentValidation>
+  -->
+  <PropertyGroup>
+    <AutoFluentValidationImportFluentValidation Condition="'$(AutoFluentValidationImportFluentValidation)' == ''">true</AutoFluentValidationImportFluentValidation>
+  </PropertyGroup>
+  <!-- The <Using> item itself is added in AutoFluentValidation.targets, after the project body, so the opt-out is honoured. -->
+</Project>

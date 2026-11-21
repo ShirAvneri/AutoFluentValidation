@@ -1,0 +1,84 @@
+<Project>
+
+  <!-- `global using FluentValidation;` so consumers only need `using AutoFluentValidation;` (see .props for the opt-out). -->
+  <ItemGroup Condition="'$(AutoFluentValidationImportFluentValidation)' == 'true' and '$(Language)' == 'C#'">
+    <Using Include="FluentValidation" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(AutoValidatorsEmitToProject)' == 'true'">
+    <_AutoValidatorsProjectDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)'))</_AutoValidatorsProjectDirectory>
+    <_AutoValidatorsFullDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(AutoValidatorsDirectory)'))</_AutoValidatorsFullDirectory>
+    <!--
+      The mirror folder is excluded from compilation and stale *.g.cs files in it are deleted, so it must not be
+      the project directory or one of its parents (e.g. "." or ".."): that would remove every source file.
+    -->
+    <_AutoValidatorsDirectoryIsUnsafe Condition="$(_AutoValidatorsProjectDirectory.ToUpperInvariant().StartsWith($(_AutoValidatorsFullDirectory.ToUpperInvariant())))">true</_AutoValidatorsDirectoryIsUnsafe>
+    <_AutoValidatorsMirrorEnabled Condition="'$(_AutoValidatorsDirectoryIsUnsafe)' != 'true'">true</_AutoValidatorsMirrorEnabled>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(_AutoValidatorsMirrorEnabled)' == 'true'">
+    <!-- Ask Roslyn to persist generator output (by default under obj/.../generated). -->
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath Condition="'$(CompilerGeneratedFilesOutputPath)' == ''">$(IntermediateOutputPath)generated</CompilerGeneratedFilesOutputPath>
+    <_AutoValidatorsGeneratedPattern>$(CompilerGeneratedFilesOutputPath)/**/AutoFluentValidation.SourceGenerator.AutoValidatorGenerator/*.g.cs</_AutoValidatorsGeneratedPattern>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(_AutoValidatorsMirrorEnabled)' == 'true'">
+    <!-- The mirror must never be compiled: the same types already come from the generator. -->
+    <Compile Remove="$(_AutoValidatorsFullDirectory)**" />
+    <!-- Still show the files in Solution Explorer. -->
+    <None Remove="$(_AutoValidatorsFullDirectory)**" />
+    <None Include="$(_AutoValidatorsFullDirectory)**/*.g.cs" />
+  </ItemGroup>
+
+  <Target Name="_AutoValidatorsCheckDirectory"
+          BeforeTargets="CoreCompile"
+          Condition="'$(_AutoValidatorsDirectoryIsUnsafe)' == 'true'">
+    <Error Code="AFV100"
+           Text="AutoValidatorsDirectory '$(AutoValidatorsDirectory)' resolves to '$(_AutoValidatorsFullDirectory)', which contains the project. Use a dedicated sub-folder such as 'AutoValidators', or set AutoValidatorsEmitToProject to false." />
+  </Target>
+
+  <!--
+    Roslyn rewrites every generated file on each compile but never deletes files for sources that no
+    longer exist (e.g. a removed model). Record when compilation starts so those leftovers can be told apart.
+  -->
+  <Target Name="_AutoValidatorsMarkCompileStart"
+          BeforeTargets="CoreCompile"
+          Condition="'$(_AutoValidatorsMirrorEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <PropertyGroup>
+      <_AutoValidatorsCompileStartTicks>$([System.DateTime]::Now.Ticks)</_AutoValidatorsCompileStartTicks>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="AutoValidatorsCopyToProject"
+          AfterTargets="CoreCompile"
+          Condition="'$(_AutoValidatorsMirrorEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <_AutoValidatorsAll Include="$(_AutoValidatorsGeneratedPattern)" />
+      <_AutoValidatorsFresh Include="@(_AutoValidatorsAll)"
+                            Condition="$([System.DateTime]::Parse('%(ModifiedTime)').Ticks) &gt;= $(_AutoValidatorsCompileStartTicks)" />
+    </ItemGroup>
+
+    <!--
+      If the compiler ran (it rewrote at least one file), anything it did not rewrite is a leftover: remove it
+      from obj. If CoreCompile was skipped as up to date, obj already reflects the last compile; keep it all.
+    -->
+    <ItemGroup Condition="'@(_AutoValidatorsFresh)' != ''">
+      <_AutoValidatorsLeftover Include="@(_AutoValidatorsAll)" Exclude="@(_AutoValidatorsFresh)" />
+    </ItemGroup>
+    <Delete Files="@(_AutoValidatorsLeftover)" />
+
+    <ItemGroup>
+      <_AutoValidatorsGenerated Include="$(_AutoValidatorsGeneratedPattern)" />
+      <_AutoValidatorsExisting Include="$(_AutoValidatorsFullDirectory)*.g.cs" />
+      <!-- Mirror files whose source no longer exists. Only *.g.cs files are ever deleted. -->
+      <_AutoValidatorsStale Include="@(_AutoValidatorsExisting)" Exclude="@(_AutoValidatorsGenerated->'$(_AutoValidatorsFullDirectory)%(Filename)%(Extension)')" />
+    </ItemGroup>
+
+    <Delete Files="@(_AutoValidatorsStale)" />
+    <Copy SourceFiles="@(_AutoValidatorsGenerated)"
+          DestinationFolder="$(_AutoValidatorsFullDirectory)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

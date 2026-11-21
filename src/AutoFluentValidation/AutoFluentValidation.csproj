@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
+    <PackageId>AutoFluentValidation</PackageId>
+    <PackageTags>validation;fluentvalidation;fluent-validation;source-generator;dataannotations;roslyn</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      AutoFluentValidation owns the FluentValidation dependency; consumers should not reference it directly.
+      The range allows FluentValidation patch/minor updates but blocks the next (breaking) major version.
+      Raise both bounds together when moving to a new major.
+    -->
+    <PackageReference Include="FluentValidation" Version="[12.2.0,13.0.0)" />
+  </ItemGroup>
+
+  <!-- Ship the source generator inside this package so consumers only reference one package. -->
+  <ItemGroup>
+    <ProjectReference Include="..\AutoFluentValidation.SourceGenerator\AutoFluentValidation.SourceGenerator.csproj"
+                      ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <None Include="..\AutoFluentValidation.SourceGenerator\bin\$(Configuration)\netstandard2.0\AutoFluentValidation.SourceGenerator.dll"
+          Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+
+  <!--
+    MSBuild integration: mirrors generated validators into the consumer's AutoValidators/ folder and imports
+    FluentValidation globally. buildTransitive/ applies the same to projects that get the package transitively.
+  -->
+  <ItemGroup>
+    <None Include="build\AutoFluentValidation.props" Pack="true" PackagePath="build" />
+    <None Include="build\AutoFluentValidation.targets" Pack="true" PackagePath="build" />
+    <None Include="buildTransitive\AutoFluentValidation.props" Pack="true" PackagePath="buildTransitive" />
+    <None Include="buildTransitive\AutoFluentValidation.targets" Pack="true" PackagePath="buildTransitive" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+</Project>

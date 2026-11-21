@@ -1,0 +1,4 @@
+<Project>
+  <!-- Stand-in for the automatic import NuGet performs for package consumers. -->
+  <Import Project="..\src\AutoFluentValidation\build\AutoFluentValidation.targets" />
+</Project>

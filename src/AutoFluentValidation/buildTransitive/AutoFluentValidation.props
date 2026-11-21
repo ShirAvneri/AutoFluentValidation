@@ -1,0 +1,4 @@
+<Project>
+  <!-- Projects that get AutoFluentValidation transitively (through another package or project) behave like direct references. -->
+  <Import Project="$(MSBuildThisFileDirectory)..\build\AutoFluentValidation.props" />
+</Project>
